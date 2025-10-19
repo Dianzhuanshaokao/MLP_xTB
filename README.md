@@ -5,7 +5,7 @@ This project implements an adaptive multiscale simulation framework to study che
 > Use a fast **machine-learned potential (MLP)** for long-timescale molecular dynamics (ML-MD), and dynamically switch to **high-accuracy extended Tight-Binding (xTB)** when rare reaction events (e.g., bond breaking, decomposition) are detected. Collected high-fidelity data are used to iteratively refine the MLP via active learning. 
 
 本项目实现了一个自适应多尺度模拟框架，用于研究金属锂与 Li–P–S–Cl 固态电解质（如 Li<sub>6</sub>PS<sub>8</sub>Cl）界面处的化学反应。其核心思想是：
-> 使用快速的**机器学习势（MLP）** 驱动长时间分子动力学（ML-MD），当检测到稀有反应事件（如键断裂、分解）时，动态切换至高精度**扩展紧束缚模型 (xTB)**方法进行局部精算。
+> 使用快速的 **机器学习势（MLP）** 驱动长时间分子动力学（ML-MD），当检测到稀有反应事件（如键断裂、分解）时，动态切换至高精度 **扩展紧束缚模型 (xTB)** 方法进行局部精算。
 所收集的高保真数据通过主动学习迭代优化 MLP 模型
 ## Key Features / 核心特性
 | FEATURE | DESCRIPTION |
