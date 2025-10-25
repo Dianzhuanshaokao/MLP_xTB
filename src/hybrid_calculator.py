@@ -33,9 +33,11 @@ class HybridCalculator(Calculator):
         atoms_ref = atoms.copy()
         atoms_ref.calc = self.mlp_calc
         E_mlp = atoms_ref.get_potential_energy()
+        print(f"Reference MLP energy: {E_mlp:.6f} eV")
         
         atoms_ref.calc = self.xtb_calc
         E_xtb = atoms_ref.get_potential_energy()
+        print(f"Reference xTB energy: {E_xtb:.6f} eV")
         
         self.energy_offset = E_xtb - E_mlp
         print(f"Energy offset set: {self.energy_offset:.6f} eV")
