@@ -71,6 +71,13 @@ if is_reactive:
     forces = hybrid_calc.results['forces']  # Smooth, stable forces
 ```
 ## References / 参考文献
-MACE
+The `MACE` (Machine-learned force fields) architecture, implemented in PyTorch, uses the e3nn library. 
+- The MACE training and evaluation code is released under the MIT licence via GitHub and is available at the following link: [https://github.com/ACEsuit/mace-foundations](https://github.com/ACEsuit/mace-foundations)
 
-xTB
+General Reference to and the implemented GFN methods: `xtb`
+- C. Bannwarth, E. Caldeweyher, S. Ehlert, A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme WIREs Comput. Mol. Sci., 2020, 11, e01493. DOI: [10.1002/wcms.1493](https://wires.onlinelibrary.wiley.com/doi/10.1002/wcms.1493)
+
+for GFN-xTB:
+- S. Grimme, C. Bannwarth, P. Shushkov, J. Chem. Theory Comput., 2017, 13, 1989-2009. DOI: [10.1021/acs.jctc.7b00118](https://pubs.acs.org/doi/10.1021/acs.jctc.7b00118)
+- C. Bannwarth, S. Ehlert and S. Grimme., J. Chem. Theory Comput., 2019, 15, 1652-1671. DOI: [10.1021/acs.jctc.8b01176](https://pubs.acs.org/doi/10.1021/acs.jctc.8b01176)
+- P. Pracht, E. Caldeweyher, S. Ehlert, S. Grimme, ChemRxiv, 2019, preprint. DOI: [10.26434/chemrxiv.8326202.v1](https://chemrxiv.org/engage/chemrxiv/article-details/60c742abbdbb890c7ba3851a)

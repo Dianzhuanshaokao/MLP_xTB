@@ -1,6 +1,7 @@
-from ase import neighborlist
+from ase.neighborlist import NeighborList
 import numpy as np
 from ase.calculators.calculator import Calculator, all_changes
+import logging
 
 class HybridCalculator(Calculator):
     """
@@ -61,14 +62,24 @@ class HybridCalculator(Calculator):
         E_mlp = atoms.get_potential_energy()
         F_mlp = atoms.get_forces()
 
+        log_file = 'outputs/adapt.log'
+        logging.basicConfig(
+            filename=log_file,
+            filemode='a', 
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            level=logging.INFO
+        )
+        logger = logging.getLogger(__name__)
+
         # --- Step 2: If no reactive atoms, return MLP result ---
         if len(reactive_indices) == 0:
             self.results = {'energy': E_mlp, 'forces': F_mlp}
+            logger.info("No reactive atoms detected. Returning pure MLP results.")
             return
 
         # --- Step 3: Build cluster (reactive atoms + buffer) ---
         cutoff = self.R_outer + 1.0
-        nl = neighborlist(cutoffs=[cutoff/2]*len(atoms), skin=0.0, self_interaction=False, bothways=True)
+        nl = NeighborList(cutoffs=[cutoff/2]*len(atoms), skin=0.0, self_interaction=False, bothways=True)
         nl.update(atoms)
         
         cluster_mask = np.zeros(len(atoms), dtype=bool)
@@ -80,6 +91,9 @@ class HybridCalculator(Calculator):
         
         cluster_atoms = atoms[cluster_indices]
         cluster_atoms.calc = self.xtb_calc
+
+        cluster_info = f"Cluster built. Size: {len(cluster_atoms)} atoms (R_inner={self.R_inner}, R_outer={self.R_outer})"
+        logger.info(f"{cluster_info}")
         
         # --- Step 4: xTB calculation (with energy alignment) ---
         E_xtb_cluster = cluster_atoms.get_potential_energy()
@@ -94,6 +108,12 @@ class HybridCalculator(Calculator):
         for local_i, global_i in enumerate(cluster_indices):
             F_xtb_global[global_i] = F_xtb_cluster[local_i]
 
+        xtb_energy_info = f"E_xTB_cluster: {E_xtb_cluster:.6f} eV, E_xTB_aligned: {E_xtb_aligned:.6f} eV"
+        xtb_force_info = f"F_xTB_cluster (max): {np.max(np.abs(F_xtb_cluster)): .4f} eV/Å"
+        offset_info = f"Energy Offset: {self.energy_offset:.6f} eV"
+        logger.info(f"xTB Calculation Complete | {xtb_energy_info} | {xtb_force_info} | {offset_info}")
+
+
         # --- Step 6: Smooth blending ---
         F_final = self._blend_forces(atoms, F_mlp, F_xtb_global, reactive_indices)
         
@@ -103,83 +123,14 @@ class HybridCalculator(Calculator):
 
         self.results = {'energy': E_final, 'forces': F_final}
 
-    def _blend_forces(self, atoms, F_mlp, F_xtb, reactive_indices):
-        F_out = F_mlp.copy()
-        pos = atoms.positions
-        for i in range(len(atoms)):
-            dists = np.linalg.norm(pos[i] - pos[reactive_indices], axis=1)
-            r = np.min(dists)
-            if r <= self.R_inner:
-                w = 1.0
-            elif r >= self.R_outer:
-                w = 0.0
-            else:
-                w = 0.5 * (1 + np.cos(np.pi * (r - self.R_inner) / (self.R_outer - self.R_inner)))
-            F_out[i] = w * F_xtb[i] + (1 - w) * F_mlp[i]
-        return F_out
-
-class HybridCalculator2:
-    def __init__(self, mace_calc, xtb_calc, atoms, reactive_indices, R_inner=2.5, R_outer=4.5):
-        self.mlp_calc = mace_calc
-        self.xtb_calc = xtb_calc
-        self.energy_offset = self.energy_alignment(atoms)
-        self.R_inner = R_inner
-        self.R_outer = R_outer
-        self.cluster_atoms, self.cluster_indicies = self.cluster(atoms, reactive_indices)
-
-    def cluster(self, atoms, reactive_indices):
-        
-        nl = neighborlist.NeighborList(self.R_outer + 1.0, skin=0.0, self_interaction=False).update(atoms)
-        cluster_mask = np.zeros(len(atoms), dtype=bool)
-        for i in reactive_indices:
-            indices, _ = nl.get_neighbors(i)
-            cluster_mask[indices] = True
-        cluster_mask[reactive_indices] = True
-        cluster_indices = np.where(cluster_mask)[0]
-        
-        cluster_atoms = atoms[cluster_indices]
-        return cluster_atoms, cluster_indices
-    
-    def energy_alignment(self, atoms):
-        atoms_ref = atoms.copy()
-        atoms_ref.calc = self.mlp_calc
-        E_mlp_ref = atoms_ref.get_potential_energy()
-
-        atoms_ref_xtb = atoms_ref.copy()
-        atoms_ref_xtb.calc = self.xtb_calc
-        E_xtb_ref = atoms_ref_xtb.get_potential_energy()
-        return E_xtb_ref - E_mlp_ref
-
-    def get_potential_energy(self, atoms, reactive_indices):
-        atoms.calc = self.mlp_calc
-        E_mlp = atoms.get_potential_energy()
-
-        if len(reactive_indices) == 0: return E_mlp
-
-        E_xtb_cluster = self.cluster_atoms.get_potential_energy() - self.energy_offset
-        E_final = self._blend_energy(atoms, E_mlp, E_xtb_cluster, reactive_indices)
-        return E_final
-
-    def get_forces(self, atoms, reactive_indices):
-        atoms.calc = self.mlp_calc
-        F_mlp = atoms.get_forces()
-
-        if len(reactive_indices) == 0: return F_mlp
-        self.cluster_atoms.calc = self.xtb_calc
-        
-        F_xtb_cluster = self.cluster_atoms.get_forces()
-        F_xtb_global = F_mlp.copy()
-        for local_i, global_i in enumerate(self.cluster_indices): F_xtb_global[global_i] = F_xtb_cluster[local_i]
-        F_final = self._blend_forces(atoms, F_mlp, F_xtb_global, reactive_indices)
-
-        return F_final
+        final_energy_info = f"E_Final: {E_final:.6f} eV"
+        final_force_info = f"F_Final (max): {np.max(np.abs(F_final)): .4f} eV/Å"
+        logger.info(f"Hybrid Calculation Finished | {final_energy_info} | {final_force_info}")
 
     def _blend_forces(self, atoms, F_mlp, F_xtb, reactive_indices):
         F_out = F_mlp.copy()
         pos = atoms.positions
         for i in range(len(atoms)):
-            if len(reactive_indices) == 0:
-                continue
             dists = np.linalg.norm(pos[i] - pos[reactive_indices], axis=1)
             r = np.min(dists)
             if r <= self.R_inner:
